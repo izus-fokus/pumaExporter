@@ -1,0 +1,8 @@
+.idea/*
+.venv/*
+.vscode/*
+tests/__pycache__/*
+*/*.pyc
+cred/credentials.json
+output/*
+logs/*

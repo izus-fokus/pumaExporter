@@ -1,0 +1,11 @@
+[Unit]
+Description=Export of all new and changed DaRUS datasets to PUMA Unibibliography
+After=network.target
+
+[Service]
+Type=oneshot
+User=pumaexporter
+WorkingDirectory=/srv/pumaExporter
+Environment=PYTHONPATH=/srv/pumaExporter/.venv
+ExecStart=/srv/pumaExporter/.venv/bin/python testPumaExporter.py
+SyslogIdentifier=test-puma-export

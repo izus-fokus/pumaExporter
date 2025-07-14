@@ -1,0 +1,33 @@
+﻿{
+    "post": {
+        "bibtex": {
+            "author": "$authors", 
+            "bibtexKey": "$key", 
+            "entrytype": "dataset", 
+            "title": "$title", 
+            "url": "$url",
+            "year": "$year",
+            "publisher": "DaRUS, Universität Stuttgart"
+        }, 
+        "group": [
+            {
+                "name": "public"
+            }
+        ], 
+        "tag": [
+            {
+                "name": "darus"
+            },
+            {
+                "name": "send:unibibliografie"
+            },
+            {
+                "name": "unbearbeitet"
+            }
+        ], 
+        "user": {
+            "name": "$user"
+        },
+	"publicationFileUpload" : { "multipartName" :"bibtex"}
+    }
+}

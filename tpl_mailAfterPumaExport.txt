@@ -1,0 +1,8 @@
+Die folgenden Daten wurden erfolgreich für Datensatz $datasetId an PUMA übergeben:
+$bibtexExport
+
+Link: $datasetUrl
+
+Link zu PUMA-Eintrag: $pumaUrl
+
+Workflow abschließen: $pumaOkUrl
