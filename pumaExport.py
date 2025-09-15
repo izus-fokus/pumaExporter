@@ -39,12 +39,20 @@ def cleanString(toBeCleaned):
     return remove_html_markup(str(toBeCleaned).replace("\r", "").replace("\n", " ").replace('"', "'"))
 
 
+def isDaRUSdoi(doi: str):
+    doiUpper = doi.upper()
+    if doiUpper.find("10.18419/DARUS") != -1:
+        return True
+    else:
+        return False
 
 class Exporter:
 
     credentials = {}
 
-    def __init__(self, credentials={}):
+    def __init__(self, credentials=None):
+        if credentials is None:
+            credentials = {}
         if not credentials:
             with open("cred/credentials.json", "r") as cred_file:
                 credentials = json.load(cred_file)
@@ -62,103 +70,106 @@ class Exporter:
         keysAndValues = {"authors": [], "affiliation": [], "authorAffiliation": [], "authorOrcids": [], "key": "",
                          "datasetDescription": "", "howpublished": "Dataset", "relatedPub": "", "datasetSubTitle": ""}
 
-        try:
-            resFields = self.callDarusAPI(
-                url="{}api/datasets/:persistentId/?persistentId={}".format(self.credentials["darus"]["apiBaseUrl"], pid),
-                ApiKey=False, )
-            version = self.getVersion(resFields)
-            if version == "DRAFT" or version == "0.0":
-                return keysAndValues
-            if "1.0" != self.getVersion(resFields):
-                keysAndValues["url"] = "{}?version={}.{}".format(resFields['persistentUrl'],
-                    resFields['latestVersion']['versionNumber'], resFields['latestVersion']['versionMinorNumber'])
-            keysAndValues["year"] = resFields['publicationDate'][:4]
-            if resFields['protocol'] == "doi":
-                keysAndValues["doi"] = '{}/{}'.format(resFields['authority'], resFields['identifier'])
-            if 'codeMeta20' in resFields['latestVersion']['metadataBlocks'] and len(
-                    resFields['latestVersion']['metadataBlocks']['codeMeta20']['fields']) > 0:
-                keysAndValues["howpublished"] = "Software"
-            fields = resFields['latestVersion']['metadataBlocks']['citation']['fields']
-            for f in fields:
-                if f["typeName"] == "dsDescription":
-                    for d in f["value"]:
-                        keysAndValues["datasetDescription"] += (self.removeHTML(d["dsDescriptionValue"]["value"]) + " ")
-                if f["typeName"] == "author":
-                    for a in f["value"]:
-                        if "authors" not in keysAndValues:
-                            keysAndValues["authors"] = []
-                        if "affiliation" not in keysAndValues:
-                            keysAndValues["affiliation"] = []
-                        keysAndValues["authors"].append(a["authorName"]["value"])
-                        keysAndValues["key"] += a["authorName"]["value"].split(", ")[0]
-                        affil = ""
-                        if "authorAffiliation" in a:
-                            if "expandedvalue" in a["authorAffiliation"]:
-                                affil = a["authorAffiliation"]["expandedvalue"]["termName"]
-                            else:
-                                affil = a["authorAffiliation"]["value"]
-                        if affil not in keysAndValues["affiliation"] and affil != '':
-                            keysAndValues["affiliation"].append(
-                                affil if "University of Stuttgart" not in affil and "Universität Stuttgart" not in affil else "University of Stuttgart")
-                        keysAndValues["authorAffiliation"].append("{}/{}".format(a["authorName"]["value"], affil))
+        if isDaRUSdoi(pid):
+            try:
+                resFields = self.callDarusAPI(
+                    url="{}api/datasets/:persistentId/?persistentId={}".format(self.credentials["darus"]["apiBaseUrl"], pid),
+                    ApiKey=False, )
+                version = self.getVersion(resFields)
+                if version == "DRAFT" or version == "0.0":
+                    return keysAndValues
+                if "1.0" != self.getVersion(resFields):
+                    keysAndValues["url"] = "{}?version={}.{}".format(resFields['persistentUrl'],
+                        resFields['latestVersion']['versionNumber'], resFields['latestVersion']['versionMinorNumber'])
+                keysAndValues["year"] = resFields['publicationDate'][:4]
+                if resFields['protocol'] == "doi":
+                    keysAndValues["doi"] = '{}/{}'.format(resFields['authority'], resFields['identifier'])
+                if 'codeMeta20' in resFields['latestVersion']['metadataBlocks'] and len(
+                        resFields['latestVersion']['metadataBlocks']['codeMeta20']['fields']) > 0:
+                    keysAndValues["howpublished"] = "Software"
+                fields = resFields['latestVersion']['metadataBlocks']['citation']['fields']
+                for f in fields:
+                    if f["typeName"] == "dsDescription":
+                        for d in f["value"]:
+                            keysAndValues["datasetDescription"] += (self.removeHTML(d["dsDescriptionValue"]["value"]) + " ")
+                    if f["typeName"] == "author":
+                        for a in f["value"]:
+                            if "authors" not in keysAndValues:
+                                keysAndValues["authors"] = []
+                            if "affiliation" not in keysAndValues:
+                                keysAndValues["affiliation"] = []
+                            keysAndValues["authors"].append(a["authorName"]["value"])
+                            keysAndValues["key"] += a["authorName"]["value"].split(", ")[0]
+                            affil = ""
+                            if "authorAffiliation" in a:
+                                if "expandedvalue" in a["authorAffiliation"]:
+                                    affil = a["authorAffiliation"]["expandedvalue"]["termName"]
+                                else:
+                                    affil = a["authorAffiliation"]["value"]
+                            if affil not in keysAndValues["affiliation"] and affil != '':
+                                keysAndValues["affiliation"].append(
+                                    affil if "University of Stuttgart" not in affil and "Universität Stuttgart" not in affil else "University of Stuttgart")
+                            keysAndValues["authorAffiliation"].append("{}/{}".format(a["authorName"]["value"], affil))
 
-                        if "authorIdentifier" in a:
-                            if "authorIdentifierScheme" not in a or a["authorIdentifierScheme"]["value"] != "ORCID":
-                                print("no orcid id for {} in dataset {}".format(a["authorIdentifier"]["value"], pid))
-                            else:
-                                keysAndValues["authorOrcids"].append(
-                                    "{}/{}".format(a["authorName"]["value"], a["authorIdentifier"]["value"], ))
+                            if "authorIdentifier" in a:
+                                if "authorIdentifierScheme" not in a or a["authorIdentifierScheme"]["value"] != "ORCID":
+                                    print("no orcid id for {} in dataset {}".format(a["authorIdentifier"]["value"], pid))
+                                else:
+                                    keysAndValues["authorOrcids"].append(
+                                        "{}/{}".format(a["authorName"]["value"], a["authorIdentifier"]["value"], ))
 
-                if f["typeName"] == "title":
-                    keysAndValues["datasetTitle"] = f["value"]
+                    if f["typeName"] == "title":
+                        keysAndValues["datasetTitle"] = f["value"]
 
-                if f["typeName"] == "subtitle":
-                    keysAndValues["datasetSubTitle"] = f["value"]
+                    if f["typeName"] == "subtitle":
+                        keysAndValues["datasetSubTitle"] = f["value"]
 
-                if f["typeName"] == "publication":
-                    pub = f["value"][0]
-                    relatedPub = "Related to: "
-                    if "publicationCitation" in pub:
-                        relatedPub = "{}{}".format(relatedPub, pub["publicationCitation"]["value"])
-                        relatedPub = (relatedPub if relatedPub[-1:] != "." else relatedPub[:-1])
-                    if "publicationIDNumber" in pub and "publicationIDType" in pub:
-                        relPubId = "{}: {}".format(pub["publicationIDType"]["value"], pub["publicationIDNumber"]["value"], )
-                        if relatedPub.find(relPubId) == -1:
-                            relatedPub = "{}. {}".format(relatedPub, relPubId)
-                    keysAndValues["relatedPub"] = self.removeNewLines(self.removeHTML(relatedPub))
-        except ApiCallFailedException as e:
-            print("502", str(e))
-        return keysAndValues
+                    if f["typeName"] == "publication":
+                        pub = f["value"][0]
+                        relatedPub = "Related to: "
+                        if "publicationCitation" in pub:
+                            relatedPub = "{}{}".format(relatedPub, pub["publicationCitation"]["value"])
+                            relatedPub = (relatedPub if relatedPub[-1:] != "." else relatedPub[:-1])
+                        if "publicationIDNumber" in pub and "publicationIDType" in pub:
+                            relPubId = "{}: {}".format(pub["publicationIDType"]["value"], pub["publicationIDNumber"]["value"], )
+                            if relatedPub.find(relPubId) == -1:
+                                relatedPub = "{}. {}".format(relatedPub, relPubId)
+                        keysAndValues["relatedPub"] = self.removeNewLines(self.removeHTML(relatedPub))
+            except ApiCallFailedException as e:
+                print("502", str(e))
+            return keysAndValues
+        return None
 
     def genBibTex(self, pid):
         setList = self.getDarusSet(pid)
+        if not setList is None:
+            authors = setList["authors"]
+            datasetTitle = setList["datasetTitle"] if "datasetTitle" in setList else ""
+            datasetSubTitle = setList["datasetSubTitle"] if "datasetSubTitle" in setList else ""
+            datasetDescription = (setList["datasetDescription"] if "datasetDescription" in setList else "")
+            year = setList["year"] if "year" in setList else ""
+            doi = setList["doi"] if "doi" in setList else ""
+            url = setList["url"] if "url" in setList else ""
+            authorOrcids = setList["authorOrcids"]
+            authorAffiliation = setList["authorAffiliation"]
+            key = setList["key"]
+            howpublished = setList["howpublished"]
+            relatedPub = setList["relatedPub"] if "relatedPub" in setList else ""
+            bibtexStr = ""
 
-        authors = setList["authors"]
-        datasetTitle = setList["datasetTitle"] if "datasetTitle" in setList else ""
-        datasetSubTitle = setList["datasetSubTitle"] if "datasetSubTitle" in setList else ""
-        datasetDescription = (setList["datasetDescription"] if "datasetDescription" in setList else "")
-        year = setList["year"] if "year" in setList else ""
-        doi = setList["doi"] if "doi" in setList else ""
-        url = setList["url"] if "url" in setList else ""
-        authorOrcids = setList["authorOrcids"]
-        authorAffiliation = setList["authorAffiliation"]
-        key = setList["key"]
-        howpublished = setList["howpublished"]
-        relatedPub = setList["relatedPub"] if "relatedPub" in setList else ""
-        bibtexStr = ""
-
-        if "University of Stuttgart" in setList["affiliation"] or "Universität Stuttgart" in setList["affiliation"]:
-            key += year + datasetTitle.split(" ")[0] + self.randomString(8)
-            template = self.credentials["puma"]["bibTexTemplate"]
-            datasetTitle = self.genTitle(datasetTitle, datasetSubTitle)
-            values = {"authors": self.joinAuthors(authors), "key": key.replace(" ", ""),
-                      "description": self.removeNewLines(datasetDescription), "doi": doi, "howpublished": howpublished,
-                      "relatedPub": relatedPub, "title": datasetTitle, "year": year, "url": url,
-                      "affiliation": ", ".join(authorAffiliation), "orcid": ", ".join(authorOrcids), }
-            fh = open(template)
-            bibtexStr = Template(fh.read()).safe_substitute(values)
-            fh.close()
-        return bibtexStr
+            if "University of Stuttgart" in setList["affiliation"] or "Universität Stuttgart" in setList["affiliation"]:
+                key += year + datasetTitle.split(" ")[0] + self.randomString(8)
+                template = self.credentials["puma"]["bibTexTemplate"]
+                datasetTitle = self.genTitle(datasetTitle, datasetSubTitle)
+                values = {"authors": self.joinAuthors(authors), "key": key.replace(" ", ""),
+                          "description": self.removeNewLines(datasetDescription), "doi": doi, "howpublished": howpublished,
+                          "relatedPub": relatedPub, "title": datasetTitle, "year": year, "url": url,
+                          "affiliation": ", ".join(authorAffiliation), "orcid": ", ".join(authorOrcids), }
+                fh = open(template)
+                bibtexStr = Template(fh.read()).safe_substitute(values)
+                fh.close()
+            return bibtexStr
+        return {}
 
     @staticmethod
     def getVersion(resFields):
@@ -462,14 +473,15 @@ class Exporter:
                         out.writelines(bibtex)
                     else:
                         darus_ds = self.getDarusSet(ds)
-                        puma_ds = pumaDatasets[doi]
-                        changes = self.getChanges(darus_ds, puma_ds)
-                        if len(changes) > 0:
-                            print("changed dataset {}".format(ds))
-                            ch_str = "Änderungen in Datensatz {}:\n".format(ds)
-                            ch_str += "\n".join(changes)
-                            ch_str += "\nUnibibliolink: {}\n\n".format(self.genPumaURL(puma_ds))
-                            changes_out.writelines(ch_str)
+                        if not darus_ds is None:
+                            puma_ds = pumaDatasets[doi]
+                            changes = self.getChanges(darus_ds, puma_ds)
+                            if len(changes) > 0:
+                                print("changed dataset {}".format(ds))
+                                ch_str = "Änderungen in Datensatz {}:\n".format(ds)
+                                ch_str += "\n".join(changes)
+                                ch_str += "\nUnibibliolink: {}\n\n".format(self.genPumaURL(puma_ds))
+                                changes_out.writelines(ch_str)
         files = [filename, filename_changes]
         return files
 
@@ -507,7 +519,7 @@ class Exporter:
         else:
             headers = {}
         if method == "get":
-            dsReq = requests.get(url, headers=headers, timeout=40)
+            dsReq = requests.get(url, headers=headers, timeout=80)
         elif method == "post":
             if data is not None:
                 dsReq = requests.post(url, headers=headers, data=json.dumps(data))
@@ -578,58 +590,60 @@ class Exporter:
         key = ""
         relatedPublications = []
 
-        try:
-            resFields = self.callDarusAPI(
-                "{}/api/datasets/:persistentId/?persistentId={}".format(self.credentials["darus"]["apiBaseUrl"], datasetId))
-            url = resFields["persistentUrl"]
-            if resFields["protocol"] == "doi":
-                doi = "{}/{}".format(resFields["authority"], resFields["identifier"])
-            fields = resFields["latestVersion"]["metadataBlocks"]["citation"]["fields"]
-            for f in fields:
-                if f["typeName"] == "dsDescription":
-                    for d in f["value"]:
-                        datasetDescription += d["dsDescriptionValue"]["value"] + " "
-                if f["typeName"] == "author":
-                    for a in f["value"]:
-                        authors.append(a["authorName"]["value"])
-                        key += a["authorName"]["value"].split(", ")[0]
-                        authorAffiliation.append(a["authorAffiliation"]["value"])
-                        if "authorIdentifier" in a and a["authorIdentifierScheme"]["value"] == "ORCID":
-                            authorOrcids.append("{}/{}".format(a["authorName"]["value"], a["authorIdentifier"]["value"], ))
+        if isDaRUSdoi(datasetId):
+            try:
+                resFields = self.callDarusAPI(
+                    "{}/api/datasets/:persistentId/?persistentId={}".format(self.credentials["darus"]["apiBaseUrl"], datasetId))
+                url = resFields["persistentUrl"]
+                if resFields["protocol"] == "doi":
+                    doi = "{}/{}".format(resFields["authority"], resFields["identifier"])
+                fields = resFields["latestVersion"]["metadataBlocks"]["citation"]["fields"]
+                for f in fields:
+                    if f["typeName"] == "dsDescription":
+                        for d in f["value"]:
+                            datasetDescription += d["dsDescriptionValue"]["value"] + " "
+                    if f["typeName"] == "author":
+                        for a in f["value"]:
+                            authors.append(a["authorName"]["value"])
+                            key += a["authorName"]["value"].split(", ")[0]
+                            authorAffiliation.append(a["authorAffiliation"]["value"])
+                            if "authorIdentifier" in a and a["authorIdentifierScheme"]["value"] == "ORCID":
+                                authorOrcids.append("{}/{}".format(a["authorName"]["value"], a["authorIdentifier"]["value"], ))
 
-                if f["typeName"] == "title":
-                    datasetTitle = f["value"]
+                    if f["typeName"] == "title":
+                        datasetTitle = f["value"]
 
-                if f["typeName"] == "publication":
-                    for p in f["value"]:
-                        pubstring = p["publicationCitation"]["value"]
-                        if "publicationIDType" in p and "publicationIDNumber" in p:
-                            pubstring += " ({}:{})".format(p["publicationIDType"]["value"], p["publicationIDNumber"]["value"], )
-                        # logging.debug(pubstring)
-                        relatedPublications.append(pubstring)
+                    if f["typeName"] == "publication":
+                        for p in f["value"]:
+                            pubstring = p["publicationCitation"]["value"]
+                            if "publicationIDType" in p and "publicationIDNumber" in p:
+                                pubstring += " ({}:{})".format(p["publicationIDType"]["value"], p["publicationIDNumber"]["value"], )
+                            # logging.debug(pubstring)
+                            relatedPublications.append(pubstring)
 
-        except ApiCallFailedException as e:
-            ret = json.loads(str(e)[str(e).index('{"status"'):])
-            return ret
+            except ApiCallFailedException as e:
+                ret = json.loads(str(e)[str(e).index('{"status"'):])
+                return ret
 
 
-        key += year + datasetTitle.split(" ")[0] + self.randomString(8)
-        dataType = "Dataset"
-        relPub = ("Related Publication: {}".format(cleanString(",\n ".join(relatedPublications))) if len(relatedPublications) > 0 else "")
-        template = self.credentials["puma"]["bibTexTemplate"]
-        values = {"authors": " and ".join(authors), "user": self.credentials["puma"]["user"], "key": key,
-                  "description": cleanString(datasetDescription), "doi": doi, "title": cleanString(datasetTitle), "url": url, "year": year,
-                  "affiliation": cleanString(" and ".join(authorAffiliation)), "orcid": " and ".join(authorOrcids), "type": dataType,
-                  "relPub": relPub, }
-        fh = open(template)
-        bibtexStr = Template(fh.read()).safe_substitute(values)
-        fh.close()
-        template = self.credentials["puma"]["jsonTemplate"]
-        fh = open(template)
-        jsonStr = Template(fh.read()).safe_substitute(values)
-        fh.close()
+            key += year + datasetTitle.split(" ")[0] + self.randomString(8)
+            dataType = "Dataset"
+            relPub = ("Related Publication: {}".format(cleanString(",\n ".join(relatedPublications))) if len(relatedPublications) > 0 else "")
+            template = self.credentials["puma"]["bibTexTemplate"]
+            values = {"authors": " and ".join(authors), "user": self.credentials["puma"]["user"], "key": key,
+                      "description": cleanString(datasetDescription), "doi": doi, "title": cleanString(datasetTitle), "url": url, "year": year,
+                      "affiliation": cleanString(" and ".join(authorAffiliation)), "orcid": " and ".join(authorOrcids), "type": dataType,
+                      "relPub": relPub, }
+            fh = open(template)
+            bibtexStr = Template(fh.read()).safe_substitute(values)
+            fh.close()
+            template = self.credentials["puma"]["jsonTemplate"]
+            fh = open(template)
+            jsonStr = Template(fh.read()).safe_substitute(values)
+            fh.close()
 
-        # logging.debug('jsonStr: ' + jsonStr)
-        jsonDict = {"main": ("", jsonStr.encode().decode("utf-8-sig"), "application/json"),
-                    "bibtex": ("", bibtexStr.encode().decode("utf-8-sig"), "text/bibtex"), }
-        return jsonDict
+            # logging.debug('jsonStr: ' + jsonStr)
+            jsonDict = {"main": ("", jsonStr.encode().decode("utf-8-sig"), "application/json"),
+                        "bibtex": ("", bibtexStr.encode().decode("utf-8-sig"), "text/bibtex"), }
+            return jsonDict
+        return {}
