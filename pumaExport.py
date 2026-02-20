@@ -634,6 +634,8 @@ class Exporter:
             for author in authors:
                 if re.search(", \\b[\\D-]+", author) is None:
                     authors[index] = "{" + author + "}"
+                    if len(authors) == 1:
+                        authors[index]="{" + authors[index] + "}"
                 index = index + 1
             values = {"authors": " and ".join(authors), "user": self.credentials["puma"]["user"], "key": key,
                       "description": cleanString(datasetDescription), "doi": doi, "title": cleanString(datasetTitle), "url": url, "year": year,
