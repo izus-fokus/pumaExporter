@@ -375,8 +375,6 @@ class Exporter:
         for author in authorlist:
             if re.search(", \\b[\\D-]+", author) is None:
                 authorlist[index] = "{" + author + "}"
-                if len(authorlist) == 1:
-                    authorlist[index] = "{" + authorlist[index] + "}"
             index += 1
         return joinstr.join(authorlist)
 
@@ -641,8 +639,6 @@ class Exporter:
             for author in authors:
                 if re.search(", \\b[\\D-]+", author) is None and not "{" in author and not "}" in author:
                     authors[index] = "{" + author + "}"
-                    if len(authors) == 1:
-                        authors[index] = "{" + authors[index] + "}"
                 index = index + 1
             values = {"authors": " and ".join(authors), "user": self.credentials["puma"]["user"], "key": key,
                       "description": cleanString(datasetDescription), "doi": doi, "title": cleanString(datasetTitle), "url": url, "year": year,
