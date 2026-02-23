@@ -373,7 +373,7 @@ class Exporter:
     def joinAuthors(authorlist, joinstr=" and "):
         index = 0
         for author in authorlist:
-            if re.search(", \\b[\\D-]+", author) is None:
+            if re.search(", \\b[\\D-]+", author) is None and not "{" in author and not "}" in author:
                 authorlist[index] = "{" + author + "}"
             index += 1
         return joinstr.join(authorlist)
