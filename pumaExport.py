@@ -371,6 +371,13 @@ class Exporter:
 
     @staticmethod
     def joinAuthors(authorlist, joinstr=" and "):
+        index = 0
+        for author in authorlist:
+            if re.search(", \\b[\\D-]+", author) is None:
+                authorlist[index] = "{" + author + "}"
+                if len(authorlist) == 1:
+                    authorlist[index] = "{" + authorlist[index] + "}"
+            index += 1
         return joinstr.join(authorlist)
 
     @staticmethod
@@ -630,13 +637,6 @@ class Exporter:
             dataType = "Dataset"
             relPub = ("Related Publication: {}".format(cleanString(",\n ".join(relatedPublications))) if len(relatedPublications) > 0 else "")
             template = self.credentials["puma"]["bibTexTemplate"]
-            index = 0
-            for author in authors:
-                if re.search(", \\b[\\D-]+", author) is None:
-                    authors[index] = "{" + author + "}"
-                    if len(authors) == 1:
-                        authors[index]="{" + authors[index] + "}"
-                index = index + 1
             values = {"authors": " and ".join(authors), "user": self.credentials["puma"]["user"], "key": key,
                       "description": cleanString(datasetDescription), "doi": doi, "title": cleanString(datasetTitle), "url": url, "year": year,
                       "affiliation": cleanString(" and ".join(authorAffiliation)), "orcid": " and ".join(authorOrcids), "type": dataType,
