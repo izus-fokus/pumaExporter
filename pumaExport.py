@@ -635,6 +635,11 @@ class Exporter:
             dataType = "Dataset"
             relPub = ("Related Publication: {}".format(cleanString(",\n ".join(relatedPublications))) if len(relatedPublications) > 0 else "")
             template = self.credentials["puma"]["bibTexTemplate"]
+            index = 0
+            for author in authors:
+                if re.search(", \\b[\\D-]+", author) is None and not "{" in author and not "}" in author:
+                    authors[index] = "{" + author + "}"
+                index = index + 1
             values = {"authors": " and ".join(authors), "user": self.credentials["puma"]["user"], "key": key,
                       "description": cleanString(datasetDescription), "doi": doi, "title": cleanString(datasetTitle), "url": url, "year": year,
                       "affiliation": cleanString(" and ".join(authorAffiliation)), "orcid": " and ".join(authorOrcids), "type": dataType,
